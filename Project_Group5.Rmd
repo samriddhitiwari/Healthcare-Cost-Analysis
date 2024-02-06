@@ -1,0 +1,427 @@
+---
+title: "IST 687 Final project Group 5"
+Name : "Sharvari Khairnar
+       Bhavya Shah
+       Tejas Amrutkar
+       Khushi Shetty
+       Samriddhi Tiwari"
+output: html_document
+date: "2023-04-29"
+---
+
+```{r}
+
+#required libaries
+library(dplyr)
+
+library(ggplot2)
+library(tidyverse)
+
+library(rsample)
+library(caret)
+library(kernlab)
+library(e1071)
+library(arules)
+library(arulesViz)
+library(imputeTS)
+
+library(rio)
+library(rpart)
+library(rpart.plot)
+library(shiny)
+library(shinydashboard)
+
+library(caret)
+```
+
+
+
+```{r}
+# Loading the given dataset
+MyData <- read_csv("https://intro-datascience.s3.us-east-2.amazonaws.com/HMO_data.csv")
+```
+
+
+```{r}
+#checking dataset
+head(MyData)
+```
+
+```{r}
+# Viewing the dataframe 
+#view(data)
+str(MyData)
+```
+
+
+
+```{r}
+#summary of the dataset
+summary(MyData)
+```
+
+
+
+```{r}
+# cleaning the dataframe and Checking for Null values 
+colSums(is.na(MyData))
+```
+
+
+
+```{r}
+# Removing Null values
+MyData$bmi<- na_interpolation(MyData$bmi)
+MyData$hypertension <- na_interpolation(MyData$hypertension)
+```
+
+
+
+```{r}
+
+#Checking third quantile of cost to set threshold for cost as expensive or inexpensive variable 
+quantile(MyData$cost, probs = c(0.75))
+```
+
+
+
+```{r}
+MyData$expensive <- MyData$cost>4775
+head(MyData)
+```
+
+```{r}
+#replacing all true values with 1 and false with 0's
+MyData <- MyData %>%mutate(expensive=str_replace_all(string=expensive,pattern="TRUE","1"))
+
+MyData <- MyData %>%mutate(expensive=str_replace_all(string=expensive,pattern="FALSE","0"))
+
+head(MyData)
+```
+
+
+
+
+
+
+```{r}
+ #dividing expensive and inexpensive people into 2 categories
+expensivePeople <- subset(MyData,expensive=="1")
+inexpensivePeople <- subset(MyData,expensive=="0")
+head(expensivePeople)
+```
+
+
+
+
+```{r}
+head(inexpensivePeople)
+```
+
+
+
+
+```{r}
+smokerPeople <- subset(MyData,smoker=="yes")
+head(smokerPeople)
+```
+
+
+
+```{r}
+# exploratory analysis
+# creating histogram for people's age under expensive category 
+hist(expensivePeople$age)
+```
+```{r}
+#people with age between 40 to 65 most likely to pay more for their healthcare cost
+```
+
+
+
+
+```{r}
+#creating histogram for analyzing age group of inexpensive healthcare group
+hist(inexpensivePeople$age)
+```
+```{r}
+#younger group starting from age 18 to 40 comes under inexpensive healthcare cost group
+```
+
+
+```{r}
+#creating histogram for analyzing age group of people who smoke
+hist(smokerPeople$age)
+```
+```{r}
+#peole of age between 18 to 25 and 40 to 45 tends to smoke more than other age groups
+```
+
+
+
+```{r}
+#creating histogram to analyze bmi for people who fall under smoking category
+hist(smokerPeople$bmi)
+```
+```{r}
+#majority people who smoke do not fall under healthy bmi range of 18 to 25
+
+```
+
+
+
+```{r}
+#creating histogram to analyze whether smokers pay more for their healthcare
+hist(as.numeric(smokerPeople$expensive))
+```
+```{r}
+# majority of people who smoke tends to pay more 
+```
+
+
+
+```{r}
+#creating histogram to analyze relation between smokers and hypertension
+hist(as.numeric(smokerPeople$hypertension))
+```
+```{r}
+# majority of people who smoke are less likely to have hypertension. hence we can say that hypertension does not directly effect on healthcare cost for people who smoke
+```
+
+
+
+```{r}
+#creating histogram to analyze relation between people who pay less for health care cost and have hypertension
+hist(as.numeric(inexpensivePeople$hypertension))
+```
+```{r}
+# majority of people who pays less for healthcare are less likely to have hypertension. hence we can say that peopel who dont have hypertension tend to pay less for there healthcare cost
+```
+
+
+```{r}
+#Boxplot for cost, bmi, age, hypertension
+boxplot(MyData$age)
+```
+
+
+```{r}
+boxplot(expensivePeople$age)
+```
+```{r}
+boxplot(inexpensivePeople$age)
+```
+
+```{r}
+boxplot(inexpensivePeople$bmi)
+```
+
+
+
+```{r}
+boxplot(MyData$age)
+```
+
+
+```{r}
+#Scatterplot for Age Vs Cost
+AgeCost <- ggplot(MyData,aes(x=age, y=cost)) + geom_point()
+AgeCost
+```
+
+```{r}
+#cost vs age : age has a positive correlation to increasing healthcare costs.
+```
+
+```{r}
+#Scatterplot for Bmi Vs Cost
+BmiCost <- ggplot(MyData,aes(x=bmi, y=cost)) + geom_point()
+BmiCost
+```
+```{r}
+#cost vs BMI: BMI has a positive correlation with cost , Peopel with BMI in the range 30-40 tends to pay higher health care cost
+```
+
+```{r}
+#Scatterplot for Hypertension Vs Cost
+HyperTensionCost <- ggplot(MyData,aes(x=hypertension, y=cost)) + geom_point()
+HyperTensionCost
+```
+```{r}
+#from the above visualization we can say that hypertension is not one of the significant factor to determine healthcare cost
+```
+
+```{r}
+#barplot for expensive count
+ExpensivePlot <- ggplot(MyData,aes(x=expensive)) + geom_bar() + ggtitle(" Count of total expensive and inexpensive")
+ExpensivePlot
+```
+```{r}
+#Majority of people from sample data falls under the inexpensive category
+```
+
+```{r}
+#Bar plot for Age vs Expensive and Inexpensive people
+ggplot(inexpensivePeople, aes(x=age,y=cost))+geom_point() + ggtitle("Age Vs Cost of Inexpensive People")
+```
+```{r}
+#there is a positive correlation between age and cost refering to the dense area of the graph 
+```
+
+```{r}
+ggplot(expensivePeople, aes(x=age,y=cost))+geom_point() + ggtitle("Age Vs Cost of Expensive People")
+```
+
+
+```{r}
+
+
+
+ #creating a new data frame
+HMOData <- data.frame(age = MyData$age,
+bmi = MyData$bmi,
+                      smoker= MyData$smoker,
+                      yearly_physical= MyData$yearly_physical,
+                      exercise =MyData$exercise,
+                      hypertension = MyData$hypertension,
+                      expensive=as.factor(MyData$expensive))
+# replacing TRUE with 1 and FALSE with 0
+HMOData <- HMOData %>% mutate( expensive = str_replace_all( string = expensive, pattern = "TRUE","1"))
+HMOData <- HMOData %>% mutate( expensive = str_replace_all( string = expensive, pattern = "FALSE","0"))
+HMOData$expensive <- as.factor(HMOData$expensive)
+str(HMOData)
+
+```
+
+
+```{r}
+library(caret)
+# Spliting data into training and testing sets for svm
+trainListS <- createDataPartition(y=HMOData$expensive,p=0.80,list=FALSE)
+trainSetS <- HMOData[trainListS,]
+testSetS <- HMOData[-trainListS,]
+dim(trainSetS)
+```
+
+
+
+```{r}
+summary(trainSetS)
+
+```
+
+
+
+```{r}
+# Building SVM model
+set.seed(123)
+library(e1071)
+ksvm_model <- svm(data= trainSetS, expensive~.,C=5, CV=3, prob.model= TRUE)
+svmPred<- predict(ksvm_model,newdata= testSetS, type= "response")
+head(svmPred)
+```
+
+
+
+```{r}
+# Checking accuracy of svm model using confusion matrix
+confusionMatrix(svmPred,as.factor(testSetS$expensive))
+```
+
+
+
+```{r}
+# Building a tree model
+rpart_model <- rpart(expensive ~ age+bmi+children+smoker+hypertension+exercise+yearly_physical, data = trainSet, method = "class")
+rpartPred <- predict(rpart_model, newdata= testSet, type= "class")
+confusionMatrix(rpartPred, as.factor(testSet$expensive))
+```
+
+
+```{r}
+# Linear model
+trainSet$expensive<-as.numeric(trainSet$expensive)
+testSet$expensive<-as.numeric(testSet$expensive)
+lmOut <- lm(expensive~age+bmi+children+smoker+hypertension+exercise+yearly_physical,data=trainSet)
+summary(lmOut)
+```
+
+
+```{r}
+# unsupervised : Apriori algorithm
+# coverting to sparse transaction matrix
+dataX <- HMOData
+dataX<-as(dataX,'transactions')
+```
+
+
+```{r}
+itemFrequency(dataX)
+```
+
+
+```{r}
+itemFrequencyPlot(dataX)
+```
+
+
+
+```{r}
+#Maps(Avg age based on location)
+MyData <- MyData %>% mutate( smoker = str_replace_all( string = smoker, pattern = "yes", "1"))
+MyData <- MyData %>% mutate( smoker = str_replace_all( string = smoker, pattern = "no", "0"))
+MyData$smoker <- as.numeric(MyData$smoker)
+dfAgg <- MyData %>% group_by(location) %>% summarise(avgsmokers = mean(smoker))
+dfAgg$state <- tolower(dfAgg$location)
+us <- map_data("state")
+us$state <- us$region
+mergedNew <- merge(dfAgg,us,on = "state")
+mergedNew <- mergedNew[order(mergedNew$order),]
+map <- ggplot(mergedNew) + geom_polygon(aes(x = long, y = lat, group = group,fill = avgsmokers),color= "Blue" )
+map + scale_fill_continuous(low = "white", high = "red", name = "avgsmokers", label = scales::comma) +
+  coord_map("albers", lat0 = 110, lat1 = 110) +
+  labs(title = "Average smokers Age by State")
+
+```
+
+```{r}
+#the average number of smokers in the states, and based on the analysis NY has the avg smokers with a frequency of 0.210
+```
+
+
+```{r}
+
+#Maps(Cost based on location)
+dfAgg <- MyData %>% group_by(location) %>% summarise(total_cost = max(cost))
+dfAgg$state <- tolower(dfAgg$location)
+us <- map_data("state")
+us$state <- us$region
+mergedNew <- merge(dfAgg,us,on = "state")
+mergedNew <- mergedNew[order(mergedNew$order),]
+map <- ggplot(mergedNew) + geom_polygon(aes(x = long, y = lat, group = group,fill = total_cost), color = "black") 
+map + scale_fill_continuous(low = "white", high = "green", name = "total_cost", label = scales::comma) + coord_map() +ggtitle(" Mappping the maximum cost per state for the expensive and non expensive people")
+
+```
+```{r}
+#this maps shows out where healthcare has been utilised max, that is the maximum cost per state for expensive and non expensive people. Based on the map, we can see that the Highest cost is in CT(Connecticut), with a frequency of 55,000$
+```
+
+```{r}
+#Maps(Avg age based on location)
+dfAgg <- MyData %>% group_by(location) %>% summarise(avgage = mean(age))
+dfAgg$state <- tolower(dfAgg$location)
+us <- map_data("state")
+us$state <- us$region
+mergedNew <- merge(dfAgg,us,on = "state")
+mergedNew <- mergedNew[order(mergedNew$order),]
+map <- ggplot(mergedNew) + geom_polygon(aes(x = long, y = lat, group = group,fill = avgage), color = "black") 
+map + scale_fill_continuous(low = "white", high = "Blue", name = "avgage", label = scales::comma) + coord_map() +ggtitle(" Mappping the maximum cost per state for as per avg age")
+
+```
+
+
+```{r}
+# the average age of people using healthcare and their location, based on the map, the Avg age is found in MA(Massachusetts) with a frequency of 40.5
+```
+
+
